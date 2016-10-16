@@ -45,10 +45,11 @@ void deleteTrailing(ListNode * head) { // Delete Last
 }
 
 void trimList(ListNode * head, int Start){ // Delete all after a certain point
-    struct ListNode *current = head, *t;
- 
+    ListNode *current = head;
+    ListNode *next = head->next;
+ 	int count = 0;
 
-	for (count = 1; count< M && curr!= NULL; count++) { // Skip the safe ones
+	for (count = 1; count < Start && current != NULL; count++) { // Skip the safe ones
 		current = current->next;
 	}
 
@@ -56,24 +57,15 @@ void trimList(ListNode * head, int Start){ // Delete all after a certain point
 		return; // They are all safe.... For now
 	}
 
-    // The main loop that traverses through the whole list
+    // The main loop that traverses through the rest of the list
     while (current != NULL) {
-        // If we reached end of list, then return
-        if (curr == NULL)
+        if (current == NULL) // We done boys
             return;
  
-        // Start from next node and delete N nodes
-        t = curr->next;
-        for (count = 1; count<=N && t!= NULL; count++)
-        {
-            struct node *temp = t;
-            t = t->next;
-            free(temp);
-        }
-        curr->next = t; // Link the previous list with remaining nodes
- 
-        // Set current pointer for next iteration
-        curr = t;
+        next = current->next; // Save next then delete the current
+        free(current);
+        current->next = NULL;
+        current = next;
     }
 }
 
@@ -116,7 +108,7 @@ void initial_setup() {
 		test++;
 	}
 	deleteTrailing(SnakeLinkedList);
-
+	trimList(SnakeLinkedList, 5);
 	// End Debugging Linked List
 }
 
