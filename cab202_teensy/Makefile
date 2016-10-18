@@ -49,7 +49,8 @@ TARGET = cab202_teensy
 SRC = graphics.c \
       lcd.c \
 	  ram_utils.c \
-	  sprite.c
+	  sprite.c \
+	  usb_serial.c
 
 # 	print.c
 

@@ -10,6 +10,9 @@
 #include "cpu_speed.h"
 #include "graphics.h"
 #include "lcd.h"
+#include "usb_serial.h"
+
+#define DebugMode 1
 
 enum Directions // Snake Direction
 {
@@ -81,6 +84,50 @@ void trimList(ListNode * head, int Start){ // Delete all after a certain point
 
 // End Linked List implementation
 
+// Helper Drawing Functions
+
+void draw_centred(unsigned char y, char* string) {
+    // Draw a string centred in the LCD when you don't know the string length
+    unsigned char l = 0, i = 0;
+    while (string[i] != '\0') {
+        l++;
+        i++;
+    }
+    char x = 42-(l*5/2);
+    draw_string((x > 0) ? x : 0, y, string);
+}
+
+// Debug Helpers
+
+void SendDebug(char* string) {
+	if (DebugMode == 1) {
+		// Send all of the characters in the string
+		unsigned char char_count = 0;
+		while (*string != '\0') {
+			usb_serial_putchar(*string);
+			string++;
+			char_count++;
+		}
+
+		// Go to a new line (force this to be the start of the line)
+		usb_serial_putchar('\r');
+		usb_serial_putchar('\n');
+	}
+}
+
+void EnterBreakpoint(unsigned long line_num) {
+	if (DebugMode == 1) {
+		int16_t curr_char;
+		char buff[85];
+		sprintf(buff, "Entered breakpoint @ line %lu. Press b to continue...", line_num);
+		SendDebug(buff);
+		do {
+			curr_char = usb_serial_getchar();
+		} while (curr_char != 'b');
+	}
+}
+
+// End Debug Helpers
 
 // Initial Vars
 
@@ -92,36 +139,34 @@ ListNode * SnakeLinkedList = NULL;
 unsigned char SnakeLength = 1;
 enum Directions SnakeDirection;
 
+// Snake Controls 
+void SnakeLoseLife() {
+	PlayerLives = PlayerLives - 1;
+	SendDebug("Snake Lost a life");
+	SnakeDirection = IDLE;
+}
 
-// Helper Drawing Functions
+void initial_screen() {
+	
+	clear_screen();
+	
+	draw_centred(LCD_Y/3, "Cian O\'Leary");
+	draw_centred(LCD_Y/1.5, "n9727442");
+
+	show_screen();
+	
+}
 
 void DrawHUD() {
 	draw_string(30, 0, "L: ");
 	draw_char(40, 0, (char)PlayerLives + '0');
     draw_string(0, 0, "S: ");
 	draw_char(10, 0, (char)PlayerScore + '0');
+
+	// For Debugging Direction
 	draw_string(60, 0, "D: ");
 	draw_char(70, 0, (char)SnakeDirection + '0');
-}
-
-
-// Snake Controls 
-void SnakeLoseLife() {
-	PlayerLives = PlayerLives - 1;
-	SnakeDirection = IDLE;
-}
-
-
-
-void initial_screen() {
-	
-	clear_screen();
-	
-	draw_string(LCD_X/2-30, LCD_Y/3, "Cian O\'Leary");
-	draw_string(LCD_X/2-20, LCD_Y/1.5, "n9727442");
-
-	show_screen();
-	
+	// End Debugging Direction
 }
 
 void initial_setup() {
@@ -214,6 +259,13 @@ void update(){
 
 int main(void) {
 	initial_setup();
+	if(DebugMode == 1) {
+		usb_init();
+		draw_centred(17, "Waiting for");
+		draw_centred(24, "debugger...");
+		show_screen();
+		while(!usb_configured() || !usb_serial_get_control());
+	}
 	initial_screen();
 	_delay_ms(2000);
 	
@@ -222,7 +274,7 @@ int main(void) {
 	}
 
 	clear_screen();	
-	draw_string(LCD_X/2-20, LCD_Y/3, "GAME OVER");
+	draw_centred(LCD_Y/3, "GAME OVER");
 	show_screen();
 	_delay_ms(2000);
 
