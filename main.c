@@ -6,13 +6,14 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "cpu_speed.h"
 #include "graphics.h"
 #include "lcd.h"
 #include "usb_serial.h"
 
-#define DebugMode 1
+#define DebugMode 0
 
 enum Directions // Snake Direction
 {
@@ -84,7 +85,7 @@ void trimList(ListNode * head, int Start){ // Delete all after a certain point
 
 // End Linked List implementation
 
-// Helper Drawing Functions
+// Helper Functions
 
 void draw_centred(unsigned char y, char* string) {
     // Draw a string centred in the LCD when you don't know the string length
@@ -95,6 +96,27 @@ void draw_centred(unsigned char y, char* string) {
     }
     char x = 42-(l*5/2);
     draw_string((x > 0) ? x : 0, y, string);
+}
+
+bool hasCollided(Sprite sprite1, Sprite sprite2) {
+
+	if (sprite2.x >= (sprite1.x + sprite1.width)) {
+		return false;
+	}
+
+	if (sprite1.x >= (sprite2.x + sprite2.width)) {
+		return false;
+	}
+
+	if (sprite2.y >= (sprite1.y + sprite1.height)) {
+		return false;
+	}
+
+	if (sprite1.y >= (sprite2.y + sprite2.height)) {
+		return false;
+	}
+
+	return true;
 }
 
 // Debug Helpers
@@ -147,14 +169,12 @@ void SnakeLoseLife() {
 }
 
 void initial_screen() {
-	
 	clear_screen();
 	
 	draw_centred(LCD_Y/3, "Cian O\'Leary");
 	draw_centred(LCD_Y/1.5, "n9727442");
 
 	show_screen();
-	
 }
 
 void DrawHUD() {
@@ -268,7 +288,7 @@ int main(void) {
 	}
 	initial_screen();
 	_delay_ms(2000);
-	
+
 	while (PlayerLives > 0) {
 		update();
 	}
