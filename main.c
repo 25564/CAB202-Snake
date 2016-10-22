@@ -198,15 +198,13 @@ void initialiseSnake() {
 }
 
 void DrawHUD() {
-	draw_string(30, 0, "L: ");
-	draw_char(40, 0, (char)PlayerLives + '0');
-    draw_string(0, 0, "S: ");
-	draw_char(10, 0, (char)PlayerScore + '0');
+	draw_string(0, 0, "L: ");
+	draw_char(10, 0, (char)PlayerLives + '0');
+    draw_string(30, 0, "S: ");
 
-	// For Debugging Direction
-	draw_string(60, 0, "D: ");
-	draw_char(70, 0, (char)SnakeDirection + '0');
-	// End Debugging Direction
+	char buff[6]; // 
+	sprintf(buff, "%d", PlayerScore);
+	draw_string(40, 0, buff);
 }
 
 void DrawSnake() {
@@ -289,7 +287,7 @@ void MoveSnake() {
 	}
 
 	if(hasCollided(FoodPellet, SnakeLinkedList->val)) {
-		PlayerScore++;
+		PlayerScore = PlayerScore + 2;
 		generateFood();
 	}
 }
