@@ -13,7 +13,8 @@
 #include "lcd.h"
 #include "usb_serial.h"
 
-#define DebugMode 0
+#define DebugMode 1
+#define InitialSnakeLength 20
 
 enum Directions // Snake Direction
 {
@@ -29,6 +30,19 @@ typedef struct sprite {
 	float x, y;				// Position of top-left sprite corner
 	unsigned char width, height;	// Pixel width and height of sprite
 } Sprite;
+
+void draw_sprite(Sprite* sprite ) { 
+	unsigned char dx, dy;
+	for (dy = 0; dy<sprite->height; dy++) {
+		for (dx = 0; dx<sprite->width; dx++) {
+			set_pixel(
+				(unsigned char) sprite->x+dx,
+				(unsigned char) sprite->y+dy + 9,
+				1
+			);
+		}
+	}
+}
 
 // Lets implement a linked list for my sanity reasons
 typedef struct node {
@@ -158,15 +172,9 @@ int PlayerScore = 0;
 
 // Initial Snake Vars
 ListNode * SnakeLinkedList = NULL;
-unsigned char SnakeLength = 1;
 enum Directions SnakeDirection;
 
-// Snake Controls 
-void SnakeLoseLife() {
-	PlayerLives = PlayerLives - 1;
-	SendDebug("Snake Lost a life");
-	SnakeDirection = IDLE;
-}
+Sprite FoodPellet;
 
 void initial_screen() {
 	clear_screen();
@@ -175,6 +183,18 @@ void initial_screen() {
 	draw_centred(LCD_Y/1.5, "n9727442");
 
 	show_screen();
+}
+
+void initialiseSnake() {
+	// IniitialSnakeLength
+	int SnakeCurrentLength = 0;
+	SnakeLinkedList = NULL;
+
+	while(SnakeCurrentLength != InitialSnakeLength) {
+		Sprite firstNode = {SnakeCurrentLength*3, 0, 3, 3};
+		push(&SnakeLinkedList, firstNode);
+		SnakeCurrentLength++;
+	}
 }
 
 void DrawHUD() {
@@ -187,6 +207,91 @@ void DrawHUD() {
 	draw_string(60, 0, "D: ");
 	draw_char(70, 0, (char)SnakeDirection + '0');
 	// End Debugging Direction
+}
+
+void DrawSnake() {
+	ListNode *IterationTemp = SnakeLinkedList;
+	ListNode *IterationTempnext = IterationTemp->next;
+
+	while(IterationTempnext->next != NULL) {
+		IterationTemp=IterationTempnext;
+		IterationTempnext=IterationTemp->next;
+		draw_sprite(&IterationTemp->val);
+	}
+}
+
+void SnakeLoseLife() {
+	PlayerLives = PlayerLives - 1;
+	SendDebug("Snake Lost a life");
+	SnakeDirection = IDLE;
+
+	trimList(SnakeLinkedList, 0);
+	initialiseSnake();
+
+	clear_screen();
+	DrawHUD();
+	show_screen();
+
+	_delay_ms(500);
+}
+
+bool collidesWithSnake(ListNode * head, Sprite TestCollision) {
+	ListNode *IterationTemp = SnakeLinkedList;
+	ListNode *IterationTempnext = IterationTemp->next;
+
+	while(IterationTempnext->next != NULL) {
+		IterationTemp=IterationTempnext;
+		IterationTempnext=IterationTemp->next;
+		if(hasCollided(IterationTemp->val, TestCollision)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void generateFood() {
+	Sprite ValidTempFood = {(rand()%80), ((rand()%30)+6), 3, 3}; 
+	
+	while (collidesWithSnake(SnakeLinkedList, ValidTempFood)){
+		Sprite TempFood = {(rand()%80), ((rand()%30)+6), 3, 3};
+		ValidTempFood = TempFood;
+	}
+
+	char buff[20];
+	sprintf(buff, "Pellet at: %8.2f, %8.2f", ValidTempFood.x, ValidTempFood.y);
+
+	SendDebug(buff);
+	FoodPellet = ValidTempFood;
+}
+
+void MoveSnake() {
+	if(SnakeDirection == IDLE) { // Don't move the snake
+		return;
+	}
+
+	deleteTrailing(SnakeLinkedList);
+	Sprite SnakeHead = SnakeLinkedList->val;
+
+	if (SnakeDirection == RIGHT) {
+		SnakeHead.x = SnakeHead.x + 3;
+	} else if (SnakeDirection == LEFT) {
+		SnakeHead.x = SnakeHead.x - 3;
+	} else if (SnakeDirection == UP) {
+		SnakeHead.y = SnakeHead.y - 3;
+	} else if (SnakeDirection == DOWN) {
+		SnakeHead.y = SnakeHead.y + 3;
+	}
+
+	push(&SnakeLinkedList, SnakeHead);
+
+	if(collidesWithSnake(SnakeLinkedList->next, SnakeLinkedList->val)) {
+		SnakeLoseLife();
+	}
+
+	if(hasCollided(FoodPellet, SnakeLinkedList->val)) {
+		PlayerScore++;
+		generateFood();
+	}
 }
 
 void initial_setup() {
@@ -210,28 +315,19 @@ void initial_setup() {
 
 	sei(); // Globally enable interrupts
 	
-	// Debugging Linked List
-	int test = 0;
-
-	while(test != 10) {
-		Sprite firstNode = {test, 4, 4, 4};
-		push(&SnakeLinkedList, firstNode);
-		test++;
-	}
-	deleteTrailing(SnakeLinkedList);
-	trimList(SnakeLinkedList, 5);
-	// End Debugging Linked List
+	initialiseSnake();
+	generateFood();
 }
 
 // Interrupt that
 // Checks for user input
 ISR(TIMER0_OVF_vect) {
 	// SW2
-	if ((PINF >> 6) & 1){
+	if ((PINF >> 6) & 1){ // TODO For walls
 	}
 
 	// SW3
-	if ((PINF >> 5) & 1){
+	if ((PINF >> 5) & 1){ // TODO For walls
 	}
 
 	// Left
@@ -274,6 +370,9 @@ ISR(TIMER0_OVF_vect) {
 void update(){
 	clear_screen();
 	DrawHUD();
+	MoveSnake();
+	DrawSnake();
+	draw_sprite(&FoodPellet);
 	show_screen();
 }
 
@@ -290,6 +389,7 @@ int main(void) {
 	_delay_ms(2000);
 
 	while (PlayerLives > 0) {
+		_delay_ms(100);
 		update();
 	}
 
@@ -297,17 +397,4 @@ int main(void) {
 	draw_centred(LCD_Y/3, "GAME OVER");
 	show_screen();
 	_delay_ms(2000);
-
-	// Debugging Linked List
-    ListNode * current = SnakeLinkedList;
-
-    while (current != NULL) {
-    	clear_screen();
-    	draw_char(LCD_X/2-20, LCD_Y/3, (char)(current->val.x+'0'));
-        current = current->next;
-        show_screen();
-    	_delay_ms(2000);
-    }
-
-    // End Debugging Linked List
 }
