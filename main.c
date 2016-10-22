@@ -11,13 +11,10 @@
 #include "cpu_speed.h"
 #include "graphics.h"
 #include "lcd.h"
-#include "usb_serial.h"
+// #include "usb_serial.h"
 
-#define DebugMode 1
+#define DebugMode 0
 #define InitialSnakeLength 2
-
-#define LTHRES 500
-#define RTHRES 500
 
 enum Directions // Snake Direction
 {
@@ -41,13 +38,15 @@ void draw_sprite(Sprite* sprite ) {
 			set_pixel(
 				(unsigned char) sprite->x+dx,
 				(unsigned char) sprite->y+dy + 9,
-				1
+				1 // We don't need any bitmaps
 			);
 		}
 	}
 }
 
 // Lets implement a linked list for my sanity reasons
+// In the real world I would build this into a library or more likely use an existing library 
+// and import it but this is university
 typedef struct node {
     Sprite val;
     struct node * next;
@@ -104,8 +103,7 @@ void trimList(ListNode * head, int Start){ // Delete all after a certain point
 
 // Helper Functions
 
-void draw_centred(unsigned char y, char* string) {
-    // Draw a string centred in the LCD when you don't know the string length
+void draw_centred(unsigned char y, char* string) { // Thanks random Week tutorial work
     unsigned char l = 0, i = 0;
     while (string[i] != '\0') {
         l++;
@@ -116,7 +114,6 @@ void draw_centred(unsigned char y, char* string) {
 }
 
 bool hasCollided(Sprite sprite1, Sprite sprite2) {
-
 	if (sprite2.x >= (sprite1.x + sprite1.width)) {
 		return false;
 	}
@@ -136,34 +133,36 @@ bool hasCollided(Sprite sprite1, Sprite sprite2) {
 	return true;
 }
 
-// Debug Helpers
+// Debug Helpers - Disabled for final submission
 
 void SendDebug(char* string) {
-	if (DebugMode == 1) {
-		// Send all of the characters in the string
-		unsigned char char_count = 0;
-		while (*string != '\0') {
-			usb_serial_putchar(*string);
-			string++;
-			char_count++;
-		}
+	// Disabled for Submittion
+	// if (DebugMode == 1) {
+	// 	// Send all of the characters in the string
+	// 	unsigned char char_count = 0;
+	// 	while (*string != '\0') {
+	// 		usb_serial_putchar(*string);
+	// 		string++;
+	// 		char_count++;
+	// 	}
 
-		// Go to a new line (force this to be the start of the line)
-		usb_serial_putchar('\r');
-		usb_serial_putchar('\n');
-	}
+	// 	// Go to a new line (force this to be the start of the line)
+	// 	usb_serial_putchar('\r');
+	// 	usb_serial_putchar('\n');
+	// }
 }
 
 void EnterBreakpoint(unsigned long line_num) {
-	if (DebugMode == 1) {
-		int16_t curr_char;
-		char buff[85];
-		sprintf(buff, "Entered breakpoint @ line %lu. Press b to continue...", line_num);
-		SendDebug(buff);
-		do {
-			curr_char = usb_serial_getchar();
-		} while (curr_char != 'b');
-	}
+	// Disabled for Submition
+	// if (DebugMode == 1) {
+	// 	int16_t curr_char;
+	// 	char buff[85];
+	// 	sprintf(buff, "Entered breakpoint @ line %lu. Press b to continue...", line_num);
+	// 	SendDebug(buff);
+	// 	do {
+	// 		curr_char = usb_serial_getchar();
+	// 	} while (curr_char != 'b');
+	// }
 }
 
 // End Debug Helpers
@@ -172,14 +171,16 @@ void EnterBreakpoint(unsigned long line_num) {
 
 int PlayerLives = 5;
 int PlayerScore = 0;
+bool wallsVisible = false;
+Sprite WallsArray[3];
 
 // Initial Snake Vars
-ListNode * SnakeLinkedList = NULL;
+ListNode * SnakeLinkedList = NULL; // Linked List containing the snake
 enum Directions SnakeDirection;
 
 Sprite FoodPellet;
 
-void initial_screen() {
+void drawInitialScreen() {
 	clear_screen();
 	
 	draw_centred(LCD_Y/3, "Cian O\'Leary");
@@ -194,10 +195,20 @@ void initialiseSnake() {
 	SnakeLinkedList = NULL;
 
 	while(SnakeCurrentLength <= (1 + InitialSnakeLength)) {
-		Sprite firstNode = {SnakeCurrentLength*3, 0, 3, 3};
+		Sprite firstNode = {SnakeCurrentLength*3 + 30, 15, 3, 3};
 		push(&SnakeLinkedList, firstNode);
 		SnakeCurrentLength++;
 	}
+}
+
+void initialiseWalls() {
+	Sprite Wall1 = {10, 0, 1, 11};
+	Sprite Wall2 = {30, 22, 1, 16};
+	Sprite Wall3 = {60, 0, 1, 22};
+
+	WallsArray[0] = Wall1;
+	WallsArray[1] = Wall2;
+	WallsArray[2] = Wall3;
 }
 
 void DrawHUD() {
@@ -219,6 +230,14 @@ void DrawSnake() {
 		IterationTemp=IterationTempnext;
 		IterationTempnext=IterationTemp->next;
 		draw_sprite(&IterationTemp->val);
+	}
+}
+
+void DrawWalls() {
+	int i;   
+	int arraySize = sizeof(WallsArray)/sizeof(Sprite); /* arraySize <-- 1<-- 4/4 */
+	for (i = 0; i < arraySize; i++) {  
+		draw_sprite(&WallsArray[i]);
 	}
 }
 
@@ -251,10 +270,21 @@ bool collidesWithSnake(ListNode * head, Sprite TestCollision) {
 	return false;
 }
 
+bool collidesWithWall(Sprite TestSprite) {
+	int i;   
+	int arraySize = sizeof(WallsArray)/sizeof(Sprite); /* arraySize <-- 1<-- 4/4 */
+	for (i = 0; i < arraySize; i++) {  
+		if (hasCollided(WallsArray[i], TestSprite)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void generateFood() {
 	Sprite ValidTempFood = {(rand()%80), ((rand()%30)+6), 3, 3}; 
 	
-	while (collidesWithSnake(SnakeLinkedList, ValidTempFood)){
+	while (collidesWithSnake(SnakeLinkedList, ValidTempFood) || collidesWithWall(ValidTempFood)){
 		Sprite TempFood = {(rand()%80), ((rand()%30)+6), 3, 3};
 		ValidTempFood = TempFood;
 	}
@@ -290,7 +320,7 @@ void MoveSnake() {
 		}
 	} else if (SnakeDirection == DOWN) {
 		SnakeHead.y = SnakeHead.y + 3;
-		if(SnakeHead.y >= 40) {
+		if(SnakeHead.y >= 38) {
 			SnakeHead.y = 0;
 		}
 	}
@@ -302,8 +332,17 @@ void MoveSnake() {
 		return;
 	}
 
+	if(wallsVisible && collidesWithWall(SnakeLinkedList->val)) {
+		SnakeLoseLife();
+		return;
+	}
+
 	if(hasCollided(FoodPellet, SnakeLinkedList->val)) {
-		PlayerScore = PlayerScore + 1;
+		if (wallsVisible == false) {
+			PlayerScore = PlayerScore + 1;
+		} else {
+			PlayerScore = PlayerScore + 2;
+		}
 		generateFood();
 	} else {
 		deleteTrailing(SnakeLinkedList);
@@ -370,11 +409,19 @@ void initial_setup() {
 // Checks for user input
 ISR(TIMER0_OVF_vect) {
 	// SW2
-	if ((PINF >> 6) & 1){ // TODO For walls
+	if ((PINF >> 6) & 1){
+		if (wallsVisible) {
+			wallsVisible = false;
+			SendDebug("Walls hidden");
+		}
 	}
 
 	// SW3
-	if ((PINF >> 5) & 1){ // TODO For walls
+	if ((PINF >> 5) & 1){
+		if (wallsVisible == false) {
+			wallsVisible = true;
+			SendDebug("Walls Show");
+		}
 	}
 
 	// Left
@@ -420,19 +467,24 @@ void update(){
 	MoveSnake();
 	DrawSnake();
 	draw_sprite(&FoodPellet);
+	if (wallsVisible) {
+		DrawWalls();
+	}
 	show_screen();
 }
 
 int main(void) {
 	initial_setup();
-	if(DebugMode == 1) {
-		usb_init();
-		draw_centred(17, "Waiting for");
-		draw_centred(24, "debugger...");
-		show_screen();
-		while(!usb_configured() || !usb_serial_get_control());
-	}
-	initial_screen();
+	// Disabled for Submittion
+	// if(DebugMode == 1) {
+	// 	usb_init();
+	// 	draw_centred(17, "Waiting for");
+	// 	draw_centred(24, "debugger...");
+	// 	show_screen();
+	// 	while(!usb_configured() || !usb_serial_get_control());
+	// }
+	initialiseWalls();
+	drawInitialScreen();
 	_delay_ms(2000);
 
 	while (PlayerLives > 0) {
