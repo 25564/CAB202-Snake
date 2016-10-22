@@ -15,6 +15,7 @@
 
 #define DebugMode 0
 #define InitialSnakeLength 2
+#define MaxSnakeLength 35
 
 enum Directions // Snake Direction
 {
@@ -171,6 +172,8 @@ void EnterBreakpoint(unsigned long line_num) {
 
 int PlayerLives = 5;
 int PlayerScore = 0;
+bool InitialMove = false;
+int SnakeLength = InitialSnakeLength;
 bool wallsVisible = false;
 Sprite WallsArray[3];
 
@@ -199,6 +202,8 @@ void initialiseSnake() {
 		push(&SnakeLinkedList, firstNode);
 		SnakeCurrentLength++;
 	}
+
+	InitialMove = true;
 }
 
 void initialiseWalls() {
@@ -257,6 +262,11 @@ void SnakeLoseLife() {
 }
 
 bool collidesWithSnake(ListNode * head, Sprite TestCollision) {
+
+	if (InitialMove) {
+		return false;
+	}
+
 	ListNode *IterationTemp = SnakeLinkedList;
 	ListNode *IterationTempnext = IterationTemp->next;
 
@@ -311,12 +321,12 @@ void MoveSnake() {
 		}
 	} else if (SnakeDirection == LEFT) {
 		SnakeHead.x = SnakeHead.x - 3;
-		if(SnakeHead.x < 0) {
+		if(SnakeHead.x <= 0) {
 			SnakeHead.x = 84;
 		}
 	} else if (SnakeDirection == UP) {
 		SnakeHead.y = SnakeHead.y - 3;
-		if(SnakeHead.y < 0) {
+		if(SnakeHead.y <= 0) {
 			SnakeHead.y = 40;
 		}
 	} else if (SnakeDirection == DOWN) {
@@ -338,12 +348,20 @@ void MoveSnake() {
 		return;
 	}
 
+	InitialMove = false;
+
 	if(hasCollided(FoodPellet, SnakeLinkedList->val)) {
 		if (wallsVisible == false) {
 			PlayerScore = PlayerScore + 1;
 		} else {
 			PlayerScore = PlayerScore + 2;
 		}
+
+		if(SnakeLength >= MaxSnakeLength) {
+			deleteTrailing(SnakeLinkedList);	
+		}
+
+		SnakeLength++;
 		generateFood();
 	} else {
 		deleteTrailing(SnakeLinkedList);
