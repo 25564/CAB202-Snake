@@ -289,10 +289,11 @@ void generateFood() {
 		ValidTempFood = TempFood;
 	}
 
-	char buff[20];
-	sprintf(buff, "Pellet at: %8.2f, %8.2f", ValidTempFood.x, ValidTempFood.y);
+	// Disabled for final submission
+	// char buff[20];
+	// sprintf(buff, "Pellet at: %8.2f, %8.2f", ValidTempFood.x, ValidTempFood.y);
 
-	SendDebug(buff);
+	// SendDebug(buff);
 	FoodPellet = ValidTempFood;
 }
 
