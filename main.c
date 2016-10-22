@@ -14,7 +14,7 @@
 #include "usb_serial.h"
 
 #define DebugMode 1
-#define InitialSnakeLength 20
+#define InitialSnakeLength 2
 
 enum Directions // Snake Direction
 {
@@ -190,7 +190,7 @@ void initialiseSnake() {
 	int SnakeCurrentLength = 0;
 	SnakeLinkedList = NULL;
 
-	while(SnakeCurrentLength != InitialSnakeLength) {
+	while(SnakeCurrentLength <= (1 + InitialSnakeLength)) {
 		Sprite firstNode = {SnakeCurrentLength*3, 0, 3, 3};
 		push(&SnakeLinkedList, firstNode);
 		SnakeCurrentLength++;
@@ -202,7 +202,8 @@ void DrawHUD() {
 	draw_char(10, 0, (char)PlayerLives + '0');
     draw_string(30, 0, "S: ");
 
-	char buff[6]; // 
+	char buff[6];
+	// 2.777 hours of continuous play under perfect conditions where the food is always in the way next cycle
 	sprintf(buff, "%d", PlayerScore);
 	draw_string(40, 0, buff);
 }
@@ -221,7 +222,6 @@ void DrawSnake() {
 void SnakeLoseLife() {
 	PlayerLives = PlayerLives - 1;
 	SendDebug("Snake Lost a life");
-	SnakeDirection = IDLE;
 
 	trimList(SnakeLinkedList, 0);
 	initialiseSnake();
@@ -231,6 +231,7 @@ void SnakeLoseLife() {
 	show_screen();
 
 	_delay_ms(500);
+	SnakeDirection = IDLE;
 }
 
 bool collidesWithSnake(ListNode * head, Sprite TestCollision) {
@@ -267,28 +268,42 @@ void MoveSnake() {
 		return;
 	}
 
-	deleteTrailing(SnakeLinkedList);
 	Sprite SnakeHead = SnakeLinkedList->val;
 
 	if (SnakeDirection == RIGHT) {
 		SnakeHead.x = SnakeHead.x + 3;
+		if(SnakeHead.x >= 84) {
+			SnakeHead.x = 0;
+		}
 	} else if (SnakeDirection == LEFT) {
 		SnakeHead.x = SnakeHead.x - 3;
+		if(SnakeHead.x < 0) {
+			SnakeHead.x = 84;
+		}
 	} else if (SnakeDirection == UP) {
 		SnakeHead.y = SnakeHead.y - 3;
+		if(SnakeHead.y < 0) {
+			SnakeHead.y = 40;
+		}
 	} else if (SnakeDirection == DOWN) {
 		SnakeHead.y = SnakeHead.y + 3;
+		if(SnakeHead.y >= 40) {
+			SnakeHead.y = 0;
+		}
 	}
 
 	push(&SnakeLinkedList, SnakeHead);
 
 	if(collidesWithSnake(SnakeLinkedList->next, SnakeLinkedList->val)) {
 		SnakeLoseLife();
+		return;
 	}
 
 	if(hasCollided(FoodPellet, SnakeLinkedList->val)) {
-		PlayerScore = PlayerScore + 2;
+		PlayerScore = PlayerScore + 1;
 		generateFood();
+	} else {
+		deleteTrailing(SnakeLinkedList);
 	}
 }
 
